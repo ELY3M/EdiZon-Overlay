@@ -15,8 +15,8 @@ else
 	APP_VERSION	:=	${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}
 endif
 
-APP_TITLE		:=	EdiZon
-APP_AUTHOR		:=	WerWolv & proferabg
+APP_TITLE		:=	EdiZon Modded by ELY M.
+APP_AUTHOR		:=	WerWolv & proferabg & ELY M.
 APP_VERSION		:=	v1.0.3
 
 TARGET			:=	EdiZon
@@ -175,6 +175,9 @@ DEPENDS	:=	$(OFILES:.o=.d)
 # main targets
 #---------------------------------------------------------------------------------
 all	:  $(OUTPUT).ovl
+
+	@echo " Ovl Made"
+	@cp -r $(OUTPUT).nro $(OUTPUT).ovl
 
 $(OUTPUT).ovl	:	$(OUTPUT).nro
 

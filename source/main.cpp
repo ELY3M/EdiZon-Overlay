@@ -48,7 +48,7 @@ public:
 
     virtual tsl::elm::Element* createUI() override {
         this->m_cheats = edz::cheat::CheatManager::getCheats();
-        auto rootFrame = new tsl::elm::OverlayFrame("EdiZon", "Cheats");
+        auto rootFrame = new tsl::elm::OverlayFrame("EdiZon Modded by ELY M.", "Cheats");
 
         if (m_cheats.size() == 0) {
             auto warning = new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, u16 x, u16 y, u16 w, u16 h){
@@ -162,122 +162,6 @@ private:
     std::map<edz::cheat::Cheat*, tsl::elm::ToggleListItem*> m_cheatToggleItems;
 };
 
-class GuiStats : public tsl::Gui {
-public:
-    GuiStats() { 
-        if (hosversionAtLeast(8,0,0)) {
-            clkrstOpenSession(&this->m_clkrstSessionCpu, PcvModuleId_CpuBus, 3);
-            clkrstOpenSession(&this->m_clkrstSessionGpu, PcvModuleId_GPU, 3);
-            clkrstOpenSession(&this->m_clkrstSessionMem, PcvModuleId_EMC, 3);
-        }
-
-        tsl::hlp::doWithSmSession([this]{
-            this->m_ipAddress = gethostid();
-            this->m_ipAddressString = formatString("%d.%d.%d.%d", this->m_ipAddress & 0xFF, (this->m_ipAddress >> 8) & 0xFF, (this->m_ipAddress >> 16) & 0xFF, (this->m_ipAddress >> 24) & 0xFF);
-        });
-
-    }
-    ~GuiStats() {
-        if (hosversionAtLeast(8,0,0)) {
-            clkrstCloseSession(&this->m_clkrstSessionCpu);
-            clkrstCloseSession(&this->m_clkrstSessionGpu);
-            clkrstCloseSession(&this->m_clkrstSessionMem);
-        }
-     }
-
-    virtual tsl::elm::Element* createUI() override {
-        auto rootFrame = new tsl::elm::OverlayFrame("EdiZon", "System Information");
-
-        auto infos = new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer *renderer, u16 x, u16 y, u16 w, u16 h){
-            renderer->drawString("CPU Temparature:", false, 45, 160, 18, renderer->a(tsl::style::color::ColorText));
-            renderer->drawString("PCB Temparature:", false, 45, 190, 18, renderer->a(tsl::style::color::ColorText));
-
-            renderer->drawRect(x, 203, w, 1, renderer->a(tsl::style::color::ColorFrame));
-            renderer->drawString("CPU Clock:", false, 45, 230, 18, renderer->a(tsl::style::color::ColorText));
-            renderer->drawString("GPU Clock:", false, 45, 260, 18, renderer->a(tsl::style::color::ColorText));
-            renderer->drawString("MEM Clock:", false, 45, 290, 18, renderer->a(tsl::style::color::ColorText));
-
-            renderer->drawRect(x, 303, w, 1, renderer->a(tsl::style::color::ColorFrame));
-            renderer->drawString("Local IP:", false, 45, 330, 18, renderer->a(tsl::style::color::ColorText));
-
-            s32 temparature = 0;
-            if(hosversionAtLeast(14,0,0)){
-                tsGetTemperature(TsLocation_Internal, &temparature);
-                renderer->drawString(formatString("%d °C", temparature).c_str(), false, 240, 160, 18, renderer->a(tsl::style::color::ColorHighlight));
-                tsGetTemperature(TsLocation_External, &temparature);
-                renderer->drawString(formatString("%d °C", temparature).c_str(), false, 240, 190, 18, renderer->a(tsl::style::color::ColorHighlight));
-            } else {
-                tsGetTemperatureMilliC(TsLocation_Internal, &temparature);
-                renderer->drawString(formatString("%.02f °C", temparature / 1000.0F).c_str(), false, 240, 160, 18, renderer->a(tsl::style::color::ColorHighlight));
-                tsGetTemperatureMilliC(TsLocation_External, &temparature);
-                renderer->drawString(formatString("%.02f °C", temparature / 1000.0F).c_str(), false, 240, 190, 18, renderer->a(tsl::style::color::ColorHighlight));
-            }
-
-            u32 cpuClock = 0, gpuClock = 0, memClock = 0;
-
-            if (hosversionAtLeast(8,0,0)) {
-                clkrstGetClockRate(&this->m_clkrstSessionCpu, &cpuClock);
-                clkrstGetClockRate(&this->m_clkrstSessionGpu, &gpuClock);
-                clkrstGetClockRate(&this->m_clkrstSessionMem, &memClock);
-            } else {
-                pcvGetClockRate(PcvModule_CpuBus, &cpuClock);
-                pcvGetClockRate(PcvModule_GPU, &gpuClock);
-                pcvGetClockRate(PcvModule_EMC, &memClock);
-            }
-
-            renderer->drawString(formatString("%.01f MHz", cpuClock / 1'000'000.0F).c_str(), false, 240, 230, 18, renderer->a(tsl::style::color::ColorHighlight));
-            renderer->drawString(formatString("%.01f MHz", gpuClock / 1'000'000.0F).c_str(), false, 240, 260, 18, renderer->a(tsl::style::color::ColorHighlight));
-            renderer->drawString(formatString("%.01f MHz", memClock / 1'000'000.0F).c_str(), false, 240, 290, 18, renderer->a(tsl::style::color::ColorHighlight));
-
-            if (this->m_ipAddress == INADDR_LOOPBACK)
-                renderer->drawString("Offline", false, 240, 330, 18, renderer->a(tsl::style::color::ColorHighlight));
-            else 
-                renderer->drawString(this->m_ipAddressString.c_str(), false, 240, 330, 18, renderer->a(tsl::style::color::ColorHighlight));
-
-            if(hosversionAtLeast(15,0,0)){
-                NifmInternetConnectionType conType;
-                u32 wifiStrength;
-                NifmInternetConnectionStatus conStatus;
-                nifmGetInternetConnectionStatus(&conType, &wifiStrength, &conStatus);
-                renderer->drawString("Connection:", false, 45, 360, 18, renderer->a(tsl::style::color::ColorText));
-                if(conStatus == NifmInternetConnectionStatus_Connected && conType == NifmInternetConnectionType_WiFi) {
-                    std::string wifiStrengthStr = "(Strong)";
-                    tsl::Color color = tsl::Color(0x0, 0xF, 0x0, 0xF);
-                    if(wifiStrength == 2){
-                        wifiStrengthStr = "(Fair)";
-                        color = tsl::Color(0xE, 0xE, 0x2, 0xF);
-                    } else if(wifiStrength <= 1){
-                        wifiStrengthStr = "(Poor)";
-                        color = tsl::Color(0xF, 0x0, 0x0, 0xF);
-                    }
-                    renderer->drawString("WiFi", false, 240, 360, 18, renderer->a(tsl::style::color::ColorHighlight));
-                    renderer->drawString(wifiStrengthStr.c_str(), false, 285, 360, 18, renderer->a(color));
-                } else if(conStatus == NifmInternetConnectionStatus_Connected && conType == NifmInternetConnectionType_Ethernet){
-                    renderer->drawString("Ethernet", false, 240, 360, 18, renderer->a(tsl::style::color::ColorHighlight));
-                } else {
-                    renderer->drawString("Disconnected", false, 240, 360, 18, renderer->a(tsl::style::color::ColorHighlight));
-                }
-            } else {
-                s32 signalStrength = 0;
-                wlaninfGetRSSI(&signalStrength);
-
-                renderer->drawString("WiFi Signal:", false, 45, 360, 18, renderer->a(tsl::style::color::ColorText));
-                renderer->drawString(formatString("%d dBm", signalStrength).c_str(), false, 240, 360, 18, renderer->a(tsl::style::color::ColorHighlight)); 
-            }
-        });
-        rootFrame->setContent(infos);
-
-        return rootFrame;
-    }
-
-    virtual void update() { }
-
-private:
-    ClkrstSession m_clkrstSessionCpu, m_clkrstSessionGpu, m_clkrstSessionMem;
-    long m_ipAddress;
-    std::string m_ipAddressString;
-};
-
 class GuiMain : public tsl::Gui {
 public:
     GuiMain() { }
@@ -287,23 +171,22 @@ public:
     virtual tsl::elm::Element* createUI() {
         auto *rootFrame = new tsl::elm::HeaderOverlayFrame();
         rootFrame->setHeader(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
-            renderer->drawString("EdiZon", false, 20, 50, 30, renderer->a(tsl::style::color::ColorText));
-            renderer->drawString("v1.0.3", false, 20, 70, 15, renderer->a(tsl::style::color::ColorDescription));
+            renderer->drawString("EdiZon - Modded by ELY M.", false, 20, 50, 30, renderer->a(tsl::style::color::ColorText));
+            renderer->drawString("v1.0.3", false, 20, 70, 20, renderer->a(tsl::style::color::ColorDescription));
 
             if (edz::cheat::CheatManager::getProcessID() != 0) {
-                renderer->drawString("Program ID:", false, 150, 40, 15, renderer->a(tsl::style::color::ColorText));
-                renderer->drawString("Build ID:", false, 150, 60, 15, renderer->a(tsl::style::color::ColorText));
-                renderer->drawString("Process ID:", false, 150, 80, 15, renderer->a(tsl::style::color::ColorText));
-                renderer->drawString(GuiMain::s_runningTitleIDString.c_str(), false, 250, 40, 15, renderer->a(tsl::style::color::ColorHighlight));
-                renderer->drawString(GuiMain::s_runningBuildIDString.c_str(), false, 250, 60, 15, renderer->a(tsl::style::color::ColorHighlight));
-                renderer->drawString(GuiMain::s_runningProcessIDString.c_str(), false, 250, 80, 15, renderer->a(tsl::style::color::ColorHighlight));
+                renderer->drawString("Program ID:", false, 50, 100, 20, renderer->a(tsl::style::color::ColorText));
+                renderer->drawString("Build ID:", false, 50, 120, 20, renderer->a(tsl::style::color::ColorText));
+                renderer->drawString("Process ID:", false, 50, 140, 20, renderer->a(tsl::style::color::ColorText));
+                renderer->drawString(GuiMain::s_runningTitleIDString.c_str(), false, 200, 100, 20, renderer->a(tsl::style::color::ColorHighlight));
+                renderer->drawString(GuiMain::s_runningBuildIDString.c_str(), false, 200, 120, 20, renderer->a(tsl::style::color::ColorHighlight));
+                renderer->drawString(GuiMain::s_runningProcessIDString.c_str(), false, 200, 140, 20, renderer->a(tsl::style::color::ColorHighlight));
             }
         }));
 
         auto list = new tsl::elm::List();
 
         auto cheatsItem = new tsl::elm::ListItem("Cheats");
-        auto statsItem  = new tsl::elm::ListItem("System Information");
         cheatsItem->setClickListener([](s64 keys) {
             if (keys & HidNpadButton_A) {
                 tsl::changeTo<GuiCheats>("");
@@ -313,18 +196,7 @@ public:
             return false;
         });
 
-        statsItem->setClickListener([](s64 keys) {
-            if (keys & HidNpadButton_A) {
-                tsl::changeTo<GuiStats>();
-                return true;
-            }
-
-            return false;
-        });
-
         list->addItem(cheatsItem);
-        list->addItem(statsItem);
-
         rootFrame->setContent(list);
 
         return rootFrame;
@@ -346,25 +218,13 @@ public:
     void initServices() override {
         dmntchtInitialize();
         edz::cheat::CheatManager::initialize();
-        tsInitialize();
-        if (hosversionAtLeast(15,0,0)) {
-            nifmInitialize(NifmServiceType_User);
-        } else {
-            wlaninfInitialize();
-        }
-        clkrstInitialize();
-        pcvInitialize();
 
     } 
 
     virtual void exitServices() override {
         dmntchtExit();
         edz::cheat::CheatManager::exit();
-        tsExit();
-        wlaninfExit();
-        nifmExit();
-        clkrstExit();
-        pcvExit();
+
     }
 
     virtual void onShow() override {
